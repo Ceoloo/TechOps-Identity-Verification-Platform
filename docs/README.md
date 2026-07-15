@@ -116,6 +116,60 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 
 ---
 
+## Verification providers (Phase 2)
+
+All identity data comes from **licensed provider adapters**. Every adapter
+extends `VerificationProvider` (`backend/src/providers/base.js`) and implements:
+
+```js
+async submit(subjectData)   // -> CheckResult
+async getStatus(referenceId) // -> CheckResult
+```
+
+Each returns the same normalised `CheckResult` shape (`provider`, `checkType`,
+`outcome`, `score`, `reference`, `raw`, `meta`) so the rules engine (Phase 3)
+never needs provider-specific knowledge. `raw` holds the provider payload and is
+encrypted before it lands in `verification_checks.raw_result_encrypted`.
+
+Implemented adapters:
+
+| Provider key | Check type | Purpose | Live-mode config keys |
+| --- | --- | --- | --- |
+| `stripe_identity` | `id_document` | Individual ID + liveness | `secret_key` |
+| `persona` | `identity_kyb` | Individual + business KYB | `api_key`, `template_id` |
+| `ofac` | `sanctions_screening` | OFAC/PEP sanctions screening | `api_key` (optional; free CSL API) |
+| `opencorporates` | `business_registry` | Business registry lookup | `api_token` (optional) |
+| `twilio_lookup` | `phone` | Phone validation | `account_sid`, `auth_token` |
+| `email_otp` | `email_otp` | Email one-time-passcode | transport injected (`sendEmail`) |
+
+**Credentials are per-business.** Adapters are built by the registry
+(`providers/registry.js`) via `loadProviderForBusiness({ businessId, providerKey })`,
+which reads the tenant's `provider_integrations` row, decrypts `config_encrypted`
+(AAD-bound to `business:<id>`), and selects the mode. No adapter ever reads a
+global env var for secrets.
+
+### Sandbox mode
+
+Setting `PROVIDER_MODE=sandbox` (the default) forces **every** adapter into
+sandbox — no real API calls, deterministic results — so local dev and tests need
+no real keys. Outcomes are driven by magic keywords in the subject data:
+
+- a field containing `sanction` → sanctions hit / `fail`
+- a field containing `fail` → `fail`
+- a field containing `review` → `manual_review`
+- otherwise → `pass`
+
+Phone validity keys off digit length; email OTP returns the generated code in
+`meta.sandbox_code` for test convenience. In production, per-business
+integrations set `mode = 'live'` and `PROVIDER_MODE` is left unset.
+
+The `email_otp` adapter is interactive: `submit` issues a code (stored only as a
+salted SHA-256 hash with expiry + attempt limit), `verify(referenceId, code)`
+checks it, and `getStatus` reports state. Challenge state uses an injectable
+store (in-memory by default; inject Redis/DB for multi-instance production).
+
+---
+
 ## Security posture (Phase 1 foundations)
 
 - **Field-level PII encryption at rest** — via the crypto module above.
