@@ -41,6 +41,11 @@ const config = {
   },
   // "sandbox" forces provider adapters into mock mode (Phase 2).
   providerMode: process.env.PROVIDER_MODE || 'sandbox',
+  // Public intake rate limiting (Phase 4).
+  intakeRateWindowMs: parseInt(process.env.INTAKE_RATE_WINDOW_MS || '60000', 10),
+  intakeRateMax: parseInt(process.env.INTAKE_RATE_MAX || '10', 10),
+  // Trusted proxy hops for correct client IP (behind a load balancer).
+  trustProxy: process.env.TRUST_PROXY || 'loopback',
 };
 
 module.exports = config;

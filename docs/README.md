@@ -206,6 +206,48 @@ verification update.
 
 ---
 
+## Public intake flow (Phase 4)
+
+The public, unauthenticated intake API (`backend/src/routes/publicIntake.js`,
+orchestrated by `services/intakeService.js`):
+
+| Method | Route | Purpose |
+| --- | --- | --- |
+| GET | `/api/public/intake/:businessId/form` | Dynamic form descriptor for the active tier |
+| POST | `/api/public/intake/:businessId` | Submit an intake (rate-limited) |
+| GET | `/api/public/verifications/:businessId/:id/status` | Customer status view |
+
+- **Dynamic form** — fields are derived from the active tier's `required_checks`
+  (`deriveIntakeFields`), so changing a tier changes the rendered form. The
+  response includes the business branding and the **active consent version +
+  text**.
+- **Explicit consent** — submit requires `consentAccepted: true` and a
+  `consentVersion` matching the active document; a snapshot of the exact text is
+  written to `consent_records` with the client IP and user agent.
+- **Orchestration** — one transaction persists the encrypted subject + consent +
+  a `pending` verification; provider checks then run (outside the txn since live
+  adapters make network calls); a second transaction stores each check with its
+  **encrypted raw payload**, runs the rules engine, and sets the final status.
+  A provider invoked for a specific required check has its result tagged with
+  that check's `check_type` (one provider can back several, e.g. Stripe covers
+  `id_document` and `liveness`).
+- **Customer status view** — returns only `status` + timestamps. Raw check
+  results and provider payloads are **never** exposed to the customer.
+- **Rate limiting** — the POST endpoint is limited per client IP
+  (`INTAKE_RATE_MAX` / `INTAKE_RATE_WINDOW_MS`).
+- **PII access audited** — subject writes/reads go through `subjectService`,
+  which logs `pii.write` / `pii.read` to `audit_log` (field names only, never
+  values).
+
+Run the API locally:
+
+```bash
+npm --workspace backend run start   # or: dev (watch mode)
+# GET http://localhost:4000/health
+```
+
+---
+
 ## Security posture (Phase 1 foundations)
 
 - **Field-level PII encryption at rest** — via the crypto module above.

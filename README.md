@@ -37,10 +37,10 @@ encryption, and how to add a verification provider adapter — is in
 ## Build phases
 
 1. **Data model & multi-tenant schema** — ✅ implemented (`/migrations`)
-2. **Verification provider adapters** (licensed sources only) — in progress
-3. Rules engine (data-driven from tier config)
-4. Consent & public intake flow
-5. Admin dashboard
+2. **Verification provider adapters** (licensed sources only) — ✅ implemented
+3. **Rules engine** (data-driven from tier config) — ✅ implemented
+4. **Consent & public intake flow** — ✅ implemented
+5. Admin dashboard — in progress
 6. Manual review queue
 7. Audit log viewer & data-subject-rights tooling
 8. Retention automation
