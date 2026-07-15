@@ -170,6 +170,42 @@ store (in-memory by default; inject Redis/DB for multi-instance production).
 
 ---
 
+## Rules engine (Phase 3)
+
+`backend/src/rules/engine.js` turns a tier's config plus the Phase 2 adapter
+results into one of three decisions:
+
+```
+auto_approve  -> verification status "approved"
+manual_review -> verification status "manual_review"
+auto_reject   -> verification status "rejected"
+```
+
+It is a **pure, data-driven** function of `tier.required_checks` and
+`tier.risk_thresholds` (jsonb) — nothing is hardcoded per business, so editing
+thresholds in the admin UI changes behavior with no deploy.
+
+Evaluation precedence (fail-safe):
+
+1. **auto_reject** — OR semantics: if *any* configured reject condition matches
+   (e.g. `any_sanctions_hit`, `min_risk_score`), reject.
+2. **auto_approve** — AND semantics: *all* configured approve conditions must
+   hold (e.g. `all_required_pass` **and** `max_risk_score`).
+3. Otherwise the configured `default` (usually `manual_review`).
+
+The aggregate `risk_score` is the highest score across all checks (most
+conservative). Supported conditions: `all_required_pass`, `any_required_fail`,
+`any_required_missing`, `required_checks_completed`, `any_error`,
+`any_manual_review`, `any_sanctions_hit`, `max_risk_score`, `min_risk_score`.
+
+`evaluateAndLog()` (`rules/index.js`) runs the evaluation and writes a
+`rules.evaluate` row to `audit_log` capturing the inputs (aggregated facts +
+per-check outcomes/scores) and the decision — **never** raw provider payloads or
+PII. Pass a transaction `runner` so the audit entry commits atomically with the
+verification update.
+
+---
+
 ## Security posture (Phase 1 foundations)
 
 - **Field-level PII encryption at rest** — via the crypto module above.
