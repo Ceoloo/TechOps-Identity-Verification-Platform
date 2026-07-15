@@ -1,0 +1,22 @@
+{
+  "name": "@techops/backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Backend API and data layer for the TechOps Identity Verification Platform.",
+  "type": "commonjs",
+  "main": "src/index.js",
+  "scripts": {
+    "migrate": "node src/db/migrate.js up",
+    "migrate:down": "node src/db/migrate.js down",
+    "migrate:status": "node src/db/migrate.js status",
+    "seed": "node src/db/seed.js",
+    "test": "node --test \"tests/**/*.test.js\""
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "pg": "^8.12.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "@techops/frontend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "React + Tailwind frontend for the TechOps Identity Verification Platform (built in later phases).",
+  "scripts": {
+    "dev": "echo \"frontend is scaffolded in a later phase\" && exit 0"
+  }
+}

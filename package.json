@@ -1,0 +1,19 @@
+{
+  "name": "techops-identity-verification-platform",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Configurable, multi-tenant identity verification (KYC/KYB) platform for TechOps.",
+  "license": "UNLICENSED",
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "migrate": "npm --workspace backend run migrate",
+    "migrate:status": "npm --workspace backend run migrate:status",
+    "test": "npm --workspace backend run test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
