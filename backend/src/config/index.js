@@ -46,6 +46,9 @@ const config = {
   intakeRateMax: parseInt(process.env.INTAKE_RATE_MAX || '10', 10),
   // Trusted proxy hops for correct client IP (behind a load balancer).
   trustProxy: process.env.TRUST_PROXY || 'loopback',
+  // Signing secret for internal auth tokens. Falls back to a value derived from
+  // the encryption key in dev; set explicitly in production.
+  authTokenSecret: process.env.AUTH_TOKEN_SECRET || '',
 };
 
 module.exports = config;

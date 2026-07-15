@@ -14,6 +14,7 @@
 
 const { withTransaction, close } = require('./index');
 const enc = require('../crypto/encryption');
+const { hashPassword } = require('../auth/password');
 
 async function seed() {
   await withTransaction(async (c) => {
@@ -46,13 +47,14 @@ async function seed() {
     }
     const aad = `business:${businessId}`;
 
-    // Internal users: one admin, one reviewer.
+    // Internal users: one admin, one reviewer (dev password: "password123").
+    const devPasswordHash = hashPassword('password123');
     await c.query(
-      `INSERT INTO users (business_id, email, role, full_name)
-       VALUES ($1,'admin@acme.example','admin','Acme Admin'),
-              ($1,'reviewer@acme.example','reviewer','Acme Reviewer')
-       ON CONFLICT (business_id, email) DO NOTHING`,
-      [businessId]
+      `INSERT INTO users (business_id, email, password_hash, role, full_name)
+       VALUES ($1,'admin@acme.example',$2,'admin','Acme Admin'),
+              ($1,'reviewer@acme.example',$2,'reviewer','Acme Reviewer')
+       ON CONFLICT (business_id, email) DO UPDATE SET password_hash = EXCLUDED.password_hash`,
+      [businessId, devPasswordHash]
     );
 
     // A verification tier: data-driven required checks + thresholds.

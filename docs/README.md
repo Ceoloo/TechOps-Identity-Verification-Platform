@@ -248,20 +248,79 @@ npm --workspace backend run start   # or: dev (watch mode)
 
 ---
 
-## Security posture (Phase 1 foundations)
+## Internal APIs: auth, admin, review, audit (Phases 5–7)
+
+Internal endpoints require a bearer token from `POST /api/auth/login`. Tokens are
+HMAC-signed and carry the user's `business_id` and `role`; the tenant is always
+taken from the token, never from the request — there is no cross-tenant surface.
+Roles: **admin** (full config) and **reviewer** (review queue only); admin is a
+superset of reviewer.
+
+**Admin (Phase 5)** — `/api/admin/*`, admin only:
+- `business` (GET/PATCH) — profile + branding
+- `tiers` (GET/POST/PATCH) — verification tier builder (required_checks, thresholds)
+- `integrations` (GET/PUT) — enter/rotate provider keys; **secrets are encrypted
+  on write and never returned** (responses expose only `has_secret` + metadata)
+- `consent` (GET/POST) — consent editor; each save **auto-versions** and activates,
+  keeping history
+- `retention` (GET/PUT) — retention_days per data_type
+- `notifications` (GET/PUT) — recipients per event (e.g. `manual_review`)
+- `users` (GET/POST) — create admin/reviewer users
+
+**Review queue (Phase 6)** — `/api/review/*`, reviewer or admin:
+- `GET /queue` — verifications in `manual_review`
+- `GET /verifications/:id` — **non-raw** check summaries (outcome/score only)
+- `GET /verifications/:id/raw` — **admin only**; decrypts raw payloads + subject
+  PII, audited as `check.read_raw` / `pii.read`
+- `POST /verifications/:id/decision` — approve/reject with a **required reason**;
+  writes `verification.decide` with reviewer id + reason
+
+**Audit + Data Subject Rights (Phase 7)** — `/api/audit/*`, admin only:
+- `GET /log` — searchable/filterable audit history (from/to/actor/action/targetId)
+- `GET /subjects?email=` — find subjects via the privacy-preserving lookup hash
+- `GET /subjects/:id/records` — all records for a subject (DSAR access), PII
+  decrypted with an audited read
+- `DELETE /subjects/:id` — **right-to-erasure**: cascades across the subject's
+  verifications/checks/consent and logs the deletion as `data_subject.delete`
+
+## Retention automation (Phase 8)
+
+`backend/src/jobs/retention.js` (schedule via cron/timer) enforces
+`retention_policies` per business:
+- `verification_checks` past the window are **anonymised** (encrypted raw payload
+  nulled, outcome row kept for audit/stats)
+- `consent_records` past the window are **deleted**
+
+Every sweep that affects rows writes a `retention.sweep` audit entry with counts.
+
+```bash
+npm --workspace backend run retention -- --dry-run   # preview
+npm --workspace backend run retention                # enforce
+```
+
+---
+
+## Security posture
 
 - **Field-level PII encryption at rest** — via the crypto module above.
 - **PII isolated in its own schema** — `pii.*`, separate from operational data.
 - **Encrypted per-business API keys** — stored in `config_encrypted`; the schema
   keeps secrets out of `config_meta` so API responses can safely return metadata
   only, never the secret.
-- **No PII in logs** — the DB layer logs only error class/message, never query
-  text or params.
-- **Audit trail ready** — `audit_log` is in place for later phases to record all
-  PII access, decisions, deletions, and retention sweeps.
-
-Rate limiting on the public intake endpoint and full audit wiring arrive with
-their respective phases (4 and beyond).
+- **No PII in logs** — the DB layer logs only error class/message; the error
+  handler returns generic 500s with a correlation id and never echoes request
+  bodies/params.
+- **All PII access audited** — subject reads/writes and raw-payload views go
+  through the service layer, which logs `pii.read` / `pii.write` /
+  `check.read_raw` (field names only, never values).
+- **Rate limiting** — the public intake and login endpoints are rate-limited per
+  client IP.
+- **Least-exposure by role** — reviewers see only non-raw summaries; raw PII is
+  admin-only and audited. Passwords are scrypt-hashed; auth tokens are
+  HMAC-signed with expiry.
+- **Right-to-erasure + retention** — subject data can be fully erased on request
+  and is automatically anonymised/deleted past its retention window, both
+  audited.
 
 ---
 

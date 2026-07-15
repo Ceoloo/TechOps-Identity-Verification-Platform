@@ -21,6 +21,7 @@ const { writeAudit } = require('../audit/log');
 const { loadProviderForBusiness, EmailOtpProvider } = require('../providers');
 const { evaluateAndLog } = require('../rules');
 const subjectService = require('./subjectService');
+const notificationService = require('./notificationService');
 const {
   getBusiness,
   getActiveTier,
@@ -282,6 +283,11 @@ async function submitIntake(params) {
 
     return outcome.status;
   });
+
+  // Best-effort notification when routed to a human reviewer.
+  if (status === 'manual_review') {
+    await notificationService.notifyManualReview({ businessId, verificationId });
+  }
 
   return { verificationId, status };
 }
