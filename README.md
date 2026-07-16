@@ -45,5 +45,14 @@ encryption, and how to add a verification provider adapter — is in
 7. **Audit log viewer & data-subject-rights tooling** (backend APIs) — ✅ implemented
 8. **Retention automation** — ✅ implemented
 
-> Backend for all 8 phases is complete and tested. The React + Tailwind
-> frontend that consumes these APIs is being built next.
+The React + Tailwind frontend (`/frontend`) implements the public intake flow,
+admin console, and review queue against these APIs.
+
+## Demo
+
+After `npm run migrate && npm --workspace backend run seed`, start the backend
+(`npm --workspace backend start`) and frontend (`npm --workspace frontend run
+dev`), then:
+
+- Public intake: `http://localhost:5173/verify/<businessId>`
+- Admin console: `http://localhost:5173/login` — `admin@acme.example` / `password123`

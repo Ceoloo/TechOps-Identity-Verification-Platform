@@ -283,6 +283,34 @@ superset of reviewer.
 - `DELETE /subjects/:id` — **right-to-erasure**: cascades across the subject's
   verifications/checks/consent and logs the deletion as `data_subject.delete`
 
+## Frontend (React + Tailwind)
+
+`/frontend` is a Vite + React + Tailwind SPA that consumes the APIs above:
+
+- **Public intake** (`/verify/:businessId`) — renders the dynamic form + consent
+  from the tenant's active tier, submits, and shows a customer status page
+  (`/verify/:businessId/status/:id`).
+- **Admin console** (`/app/*`, admin) — business/branding, tier builder,
+  integration key entry (secrets write-only), consent editor with version
+  history, retention, notifications, users, audit log viewer, and the data
+  subject request tool (search / export / erase).
+- **Review queue** (`/app/review`, reviewer or admin) — queue, per-verification
+  check summaries, admin-only audited raw view, and approve/reject with a reason.
+
+Auth is a bearer token from `/api/auth/login` kept in `localStorage`; the token's
+role drives which nav/routes are available. The dev server proxies `/api` to the
+backend on `:4000`.
+
+```bash
+npm --workspace frontend run dev      # http://localhost:5173
+npm --workspace frontend run build    # production build to frontend/dist
+```
+
+Demo login after seeding: `admin@acme.example` / `password123` (and
+`reviewer@acme.example`).
+
+---
+
 ## Retention automation (Phase 8)
 
 `backend/src/jobs/retention.js` (schedule via cron/timer) enforces
