@@ -1,0 +1,31 @@
+name: ci
+on:
+  push:
+    branches: [ "claude/aion-board-health-operating-system**", main ]
+  pull_request:
+  workflow_dispatch:
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install pytest
+      - name: Unit + compliance tests
+        run: PYTHONPATH=src python -m pytest -q
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python scripts/secret_scan.py .
+  production-readiness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install pyyaml
+      - run: python scripts/pr_score.py production-readiness.yaml artifacts/production-readiness.json
+      - uses: actions/upload-artifact@v4
+        with: { name: production-readiness, path: artifacts/production-readiness.json }
