@@ -1,0 +1,16 @@
+version: 1
+repository: Ceoloo/TechOps-Identity-Verification-Platform
+service_type: api
+owners:
+  - role: compliance
+controls:
+  automated_tests: {implemented: true, ci_verified: true, evidence: ["tests/test_identity.py (18 tests)"]}
+  reproducible_deployment: {implemented: true, staging_verified: false, evidence: ["Dockerfile"]}
+  live_integrations: {implemented: true, mocked_verified: true, live_verified: false, evidence: ["FakeVerificationProvider contract + webhook signature tests"]}
+  secrets_management: {implemented: true, ci_verified: true, evidence: [".env.example", "EnvKeyProvider", "secret_scan"]}
+  monitoring: {implemented: false, evidence: []}
+  backup_recovery: {implemented: false, evidence: []}
+  rollback: {implemented: true, evidence: ["RUNBOOK.md"]}
+  failure_testing: {implemented: true, ci_verified: true, evidence: ["wrong-key + tampered-ciphertext + invalid-webhook tests"]}
+  compliance: {implemented: true, ci_verified: true, evidence: ["field-level encryption, access log, versioned rules, deletion/export, RBAC, PII-leak tests"]}
+  business_outcomes: {implemented: true, ci_verified: true, evidence: ["non-PII identity health telemetry"]}

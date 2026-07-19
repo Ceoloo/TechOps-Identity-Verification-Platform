@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.env
+.aion-data/
+artifacts/*.json
+.spool/
+.pytest_cache/

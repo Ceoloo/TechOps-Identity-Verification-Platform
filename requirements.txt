@@ -1,0 +1,5 @@
+# Core identity platform is stdlib-only for testability.
+# PRODUCTION: use real AEAD + KMS:
+# cryptography>=42.0    # AES-256-GCM FieldCipher implementation
+# fastapi>=0.110        # provider webhook receiver
+# requests>=2.31        # provider + telemetry HTTP
