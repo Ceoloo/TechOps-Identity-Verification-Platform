@@ -312,9 +312,113 @@ async function getStatus(businessId, verificationId) {
   };
 }
 
+/**
+ * Re-run the rules engine for an existing verification using the current stored
+ * check outcomes, and update its status. Used after an asynchronous/interactive
+ * check (e.g. email OTP) resolves. Returns the new status.
+ */
+async function reevaluateVerification({ businessId, verificationId, ipAddress = null }) {
+  return db.withTransaction(async (c) => {
+    const { rows: vrows } = await c.query(
+      `SELECT v.id, v.tier_id, t.required_checks, t.risk_thresholds
+         FROM verifications v
+         LEFT JOIN verification_tiers t ON t.id = v.tier_id
+        WHERE v.id=$1 AND v.business_id=$2
+        FOR UPDATE OF v`,
+      [verificationId, businessId]
+    );
+    if (vrows.length === 0) {
+      const err = new IntakeError('Verification not found', 404);
+      throw err;
+    }
+    const tier = {
+      id: vrows[0].tier_id,
+      required_checks: vrows[0].required_checks || [],
+      risk_thresholds: vrows[0].risk_thresholds || {},
+    };
+
+    const { rows: checkRows } = await c.query(
+      `SELECT check_type, provider, outcome, score
+         FROM verification_checks WHERE verification_id=$1 AND business_id=$2`,
+      [verificationId, businessId]
+    );
+    const results = checkRows.map((r) => ({
+      provider: r.provider,
+      checkType: r.check_type,
+      outcome: r.outcome,
+      score: r.score === null ? null : Number(r.score),
+      raw: {},
+      meta: {},
+    }));
+
+    const outcome = await evaluateAndLog({
+      tier,
+      results,
+      businessId,
+      verificationId,
+      actor: 'rules-engine',
+      ipAddress,
+      runner: c,
+    });
+
+    const isAuto = outcome.status === 'approved' || outcome.status === 'rejected';
+    await c.query(
+      `UPDATE verifications
+          SET status=$1, risk_score=$2, decision_reason=$3,
+              decided_at = CASE WHEN $4 THEN now() ELSE NULL END
+        WHERE id=$5`,
+      [outcome.status, outcome.riskScore, outcome.reasons.join('; ').slice(0, 500), isAuto, verificationId]
+    );
+
+    return outcome.status;
+  });
+}
+
+/**
+ * Verify a submitted email OTP code for a verification, update the matching
+ * check, and re-evaluate the verification. Returns the customer-safe status.
+ */
+async function verifyEmailOtp({ businessId, verificationId, reference, code, ipAddress = null }) {
+  if (!reference || !code) throw new IntakeError('reference and code are required');
+
+  // Confirm the verification belongs to this tenant and has a matching check.
+  const { rows: checkRows } = await db.query(
+    `SELECT vc.id FROM verification_checks vc
+       JOIN verifications v ON v.id = vc.verification_id
+      WHERE v.id=$1 AND v.business_id=$2 AND vc.provider='email_otp' AND vc.provider_reference=$3`,
+    [verificationId, businessId, reference]
+  );
+  if (checkRows.length === 0) {
+    throw new IntakeError('No matching email OTP challenge for this verification', 404);
+  }
+
+  const adapter = await loadProviderForBusiness({ businessId, providerKey: 'email_otp' });
+  const result = await adapter.verify(reference, code);
+
+  await db.query(
+    `UPDATE verification_checks
+        SET outcome=$1, score=$2, raw_result_encrypted=$3
+      WHERE id=$4`,
+    [
+      result.outcome,
+      typeof result.score === 'number' ? result.score : null,
+      enc.encryptJson(result.raw || {}, aadFor(businessId)),
+      checkRows[0].id,
+    ]
+  );
+
+  const status = await reevaluateVerification({ businessId, verificationId, ipAddress });
+  if (status === 'manual_review') {
+    await notificationService.notifyManualReview({ businessId, verificationId });
+  }
+  return { verificationId, verified: result.outcome === 'pass', status };
+}
+
 module.exports = {
   IntakeError,
   getIntakeForm,
   submitIntake,
   getStatus,
+  reevaluateVerification,
+  verifyEmailOtp,
 };

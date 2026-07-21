@@ -11,11 +11,18 @@
  */
 
 const { runRetention } = require('../services/retentionService');
+const { DbOtpStore } = require('../providers/otpStore');
 const { close } = require('../db');
 
 async function main() {
   const dryRun = process.argv.includes('--dry-run');
   const results = await runRetention({ dryRun });
+
+  // Housekeeping: purge expired email OTP challenges (independent of policy).
+  if (!dryRun) {
+    const purged = await DbOtpStore.deleteExpired();
+    if (purged > 0) console.log(`[retention] purged ${purged} expired email OTP challenge(s).`);
+  }
 
   let total = 0;
   for (const r of results) {

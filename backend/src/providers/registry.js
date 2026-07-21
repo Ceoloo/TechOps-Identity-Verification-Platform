@@ -20,6 +20,7 @@ const { OfacProvider } = require('./ofac');
 const { OpenCorporatesProvider } = require('./openCorporates');
 const { TwilioLookupProvider } = require('./twilioLookup');
 const { EmailOtpProvider } = require('./emailOtp');
+const { DbOtpStore } = require('./otpStore');
 
 const PROVIDER_CLASSES = {
   [StripeIdentityProvider.key]: StripeIdentityProvider,
@@ -113,7 +114,15 @@ async function loadProviderForBusiness({
 
   const mode = resolveMode(row.mode);
   const Cls = getProviderClass(providerKey);
-  return new Cls(decryptedConfig, { ...options, mode });
+
+  // The email OTP adapter needs durable, cross-instance challenge storage.
+  // Inject a per-tenant DB-backed store unless the caller supplied one.
+  const adapterOptions = { ...options, mode };
+  if (providerKey === EmailOtpProvider.key && !adapterOptions.store) {
+    adapterOptions.store = new DbOtpStore({ businessId, runner: client || undefined });
+  }
+
+  return new Cls(decryptedConfig, adapterOptions);
 }
 
 module.exports = {

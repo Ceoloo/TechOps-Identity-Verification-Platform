@@ -63,4 +63,22 @@ router.get(
   })
 );
 
+// Submit an email OTP code to complete an interactive check, then re-evaluate.
+router.post(
+  '/verifications/:businessId/:id/email-otp',
+  submitLimiter,
+  asyncHandler(async (req, res) => {
+    const body = req.body || {};
+    const result = await intake.verifyEmailOtp({
+      businessId: req.params.businessId,
+      verificationId: req.params.id,
+      reference: body.reference,
+      code: body.code,
+      ipAddress: req.ip,
+    });
+    // Customer-safe: expose only whether it verified and the resulting status.
+    res.json({ verified: result.verified, status: result.status });
+  })
+);
+
 module.exports = router;

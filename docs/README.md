@@ -166,7 +166,12 @@ integrations set `mode = 'live'` and `PROVIDER_MODE` is left unset.
 The `email_otp` adapter is interactive: `submit` issues a code (stored only as a
 salted SHA-256 hash with expiry + attempt limit), `verify(referenceId, code)`
 checks it, and `getStatus` reports state. Challenge state uses an injectable
-store (in-memory by default; inject Redis/DB for multi-instance production).
+store; the registry injects a **durable, per-tenant Postgres-backed store**
+(`email_otp_challenges`, payload encrypted at rest) so a code issued on one node
+survives restarts and verifies on another. Customers complete the check via
+`POST /api/public/verifications/:businessId/:id/email-otp` (`{ reference, code }`),
+which verifies the code, updates the check, and **re-runs the rules engine** to
+resolve the verification. Expired challenges are purged by the retention job.
 
 ---
 
